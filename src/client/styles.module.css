@@ -1,0 +1,2205 @@
+/* ===========================================================================
+   AI Workbench — visual system
+   ===========================================================================
+
+   Direction: a precision instrument, not a form. The shell is a dense, quiet
+   surface; the only loud things on screen are the user's own windows and the one
+   input that creates them. Everything is built out of hairlines, layered fills
+   and a single accent, so the plugin reads as part of a professional desktop
+   tool rather than a web page embedded in one.
+
+   Ground rules this file keeps:
+
+     · **Theme-following.** Every colour is a `--dsw-alias-*` token with a hex
+       fallback, so the workbench follows the shell's light and dark themes and
+       still renders if a token is ever renamed upstream.
+     · **Two local scales.** `--wb-*` holds the derived palette, `--wb-r-*` the
+       radii. Nothing below reaches for a raw colour except the shadows.
+     · **Motion is decoration.** Every transition has a
+       `prefers-reduced-motion` escape and nothing animates layout properties
+       that a user is dragging.
+     · **The native strip is sacred.** `.layer` is told the strip height through
+       `data-chrome-top`; no window chrome may ever be drawn above it.
+   =========================================================================== */
+
+.panel {
+  /* Derived palette. One place to retune the whole plugin. */
+  --wb-surface: var(--dsw-alias-bg-base, #16171a);
+  --wb-raised: var(--dsw-alias-bg-layer-1, #1c1d21);
+  --wb-raised-2: var(--dsw-alias-bg-layer-2, #222328);
+  --wb-raised-3: var(--dsw-alias-bg-layer-3, #292a30);
+  --wb-line: var(--dsw-alias-border-l1, #2c2d33);
+  --wb-line-strong: var(--dsw-alias-border-l2, #3a3b42);
+  --wb-ink: var(--dsw-alias-label-primary, #ececef);
+  --wb-ink-dim: var(--dsw-alias-label-secondary, #a8a9b0);
+  --wb-ink-faint: var(--dsw-alias-label-tertiary, #7c7d85);
+  --wb-ink-ghost: var(--dsw-alias-label-caption, #63646b);
+  --wb-accent: var(--dsw-alias-brand-primary, #4d6bfe);
+  --wb-accent-ink: var(--dsw-alias-label-primary-foreground, #fff);
+  --wb-ok: var(--dsw-alias-state-success-primary, #3fb950);
+  --wb-warn: var(--dsw-alias-state-warn-primary, #d29922);
+  --wb-bad: var(--dsw-alias-state-error-primary, #f85149);
+  --wb-mono: 'Cascadia Code', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  --wb-display: 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  --wb-body: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* Radii, from the tightest chip to the outer sheet. */
+  --wb-r-sm: 6px;
+  --wb-r-md: 9px;
+  --wb-r-lg: 13px;
+  --wb-r-xl: 18px;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--wb-surface);
+  color: var(--wb-ink);
+  font-family: var(--wb-body);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.002em;
+  container-type: inline-size;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A slow, very low-contrast wash behind the content. Two radial fields, one in
+   the accent, one neutral — enough to stop the panel reading as a flat slab
+   without ever competing with text. */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 60% at 12% -10%, color-mix(in srgb, var(--wb-accent) 22%, transparent), transparent 70%),
+    radial-gradient(90% 50% at 100% 0%, color-mix(in srgb, var(--wb-ink) 5%, transparent), transparent 72%);
+  opacity: 0.55;
+  z-index: 0;
+}
+
+/* ---------------------------------------------------------------- header -- */
+
+.panelHeader {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 16px 16px 13px;
+  border-bottom: 1px solid var(--wb-line);
+}
+
+/* The brand glyph: a hairline square rotated 45°, with a filled inner pane. It
+   reads as a "window" at 26px and as a precision mark at a glance. */
+.brandMark {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--wb-accent) 88%, #fff 6%), var(--wb-accent));
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 22%) inset,
+    0 4px 12px -4px color-mix(in srgb, var(--wb-accent) 70%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+
+.brandMark::after {
+  content: '';
+  position: absolute;
+  inset: 7px 6px 6px 7px;
+  border-radius: 2px;
+  border: 1.25px solid rgb(255 255 255 / 82%);
+  border-bottom-width: 2.5px;
+  opacity: 0.9;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.panelTitle {
+  margin: 0;
+  font-family: var(--wb-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.012em;
+  color: var(--wb-ink);
+}
+
+.panelHint {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--wb-ink-faint);
+  text-wrap: pretty;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* Square, borderless, monochrome: a toolbar button, not a call to action. */
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--wb-r-sm);
+  background: transparent;
+  color: var(--wb-ink-faint);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
+}
+
+.iconButton:hover {
+  background: color-mix(in srgb, var(--wb-ink) 8%, transparent);
+  border-color: var(--wb-line);
+  color: var(--wb-ink);
+}
+
+.iconButton:active {
+  background: color-mix(in srgb, var(--wb-ink) 12%, transparent);
+}
+
+.iconButton[data-on='true'] {
+  color: var(--wb-accent);
+  border-color: color-mix(in srgb, var(--wb-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--wb-accent) 12%, transparent);
+}
+
+/* ---------------------------------------------------------------- body -- */
+
+.panelBody {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 14px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsw-alias-scrollbar-bg-l2, #33343a) transparent;
+}
+
+.panelBody::-webkit-scrollbar {
+  width: 10px;
+}
+
+.panelBody::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 99px;
+  background-clip: content-box;
+  background-color: var(--dsw-alias-scrollbar-bg-l2, #33343a);
+}
+
+.panelBody::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsw-alias-scrollbar-hover-l2, #4a4b53);
+}
+
+/* ------------------------------------------------------------- composer -- */
+
+/* The one input. Given the weight of a card rather than a form field: this is
+   the product's front door, and it should look like the thing you came to use. */
+.composer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px 12px 11px;
+  border-radius: var(--wb-r-lg);
+  border: 1px solid var(--wb-line-strong);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--wb-ink) 4%, transparent), transparent 42%),
+    var(--wb-raised);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 5%) inset,
+    0 12px 28px -22px rgb(0 0 0 / 80%);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.composer:focus-within {
+  border-color: color-mix(in srgb, var(--wb-accent) 55%, var(--wb-line-strong));
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 6%) inset,
+    0 0 0 3px color-mix(in srgb, var(--wb-accent) 16%, transparent),
+    0 16px 34px -24px rgb(0 0 0 / 85%);
+}
+
+.composerTop {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.composerLabel {
+  font-family: var(--wb-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--wb-ink);
+}
+
+.composerHint {
+  margin-left: auto;
+  font-family: var(--wb-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wb-ink-ghost);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 74px;
+  max-height: 220px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid var(--wb-line);
+  border-radius: var(--wb-r-md);
+  background: color-mix(in srgb, var(--wb-surface) 78%, transparent);
+  color: var(--wb-ink);
+  font-family: var(--wb-body);
+  font-size: 13px;
+  line-height: 1.55;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.textarea::placeholder {
+  color: var(--wb-ink-ghost);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--wb-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--wb-surface) 92%, transparent);
+}
+
+.composerFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.composerFootSpacer {
+  flex: 1 1 auto;
+}
+
+/* ------------------------------------------------------------- controls -- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--wb-r-md);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--wb-accent) 92%, #fff 8%),
+    var(--wb-accent)
+  );
+  color: var(--wb-accent-ink);
+  font-family: var(--wb-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 20%) inset,
+    0 6px 16px -8px color-mix(in srgb, var(--wb-accent) 80%, transparent);
+  transition:
+    transform 0.12s ease,
+    filter 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.button:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 24%) inset,
+    0 10px 22px -10px color-mix(in srgb, var(--wb-accent) 85%, transparent);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.buttonGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--wb-line);
+  border-radius: var(--wb-r-sm);
+  background: color-mix(in srgb, var(--wb-ink) 3%, transparent);
+  color: var(--wb-ink-dim);
+  font-family: var(--wb-body);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
+}
+
+.buttonGhost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-ink) 8%, transparent);
+  border-color: var(--wb-line-strong);
+  color: var(--wb-ink);
+}
+
+.buttonGhost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.buttonDanger {
+  color: var(--wb-bad);
+  border-color: color-mix(in srgb, var(--wb-bad) 28%, var(--wb-line));
+}
+
+.buttonDanger:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgb(248 81 73 / 14%));
+  border-color: color-mix(in srgb, var(--wb-bad) 55%, transparent);
+  color: var(--wb-bad);
+}
+
+/* ---------------------------------------------------------------- chips -- */
+
+.chipRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.chipLabel {
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--wb-ink-ghost);
+  margin-right: 2px;
+}
+
+.chip {
+  padding: 4px 9px;
+  border: 1px solid var(--wb-line);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--wb-ink) 3%, transparent);
+  color: var(--wb-ink-dim);
+  font-family: var(--wb-body);
+  font-size: 11.5px;
+  line-height: 1.35;
+  cursor: pointer;
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
+}
+
+.chip:hover {
+  border-color: var(--wb-line-strong);
+  color: var(--wb-ink);
+}
+
+.chipActive {
+  border-color: color-mix(in srgb, var(--wb-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--wb-accent) 17%, transparent);
+  color: var(--wb-ink);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wb-accent) 22%, transparent) inset;
+}
+
+/* Layout presets, drawn as miniature arrangements rather than described. */
+.layoutChip {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 52px;
+  padding: 5px 5px 4px;
+  border: 1px solid var(--wb-line);
+  border-radius: var(--wb-r-sm);
+  background: color-mix(in srgb, var(--wb-ink) 3%, transparent);
+  color: var(--wb-ink-faint);
+  cursor: pointer;
+  transition:
+    border-color 0.14s ease,
+    background-color 0.14s ease,
+    color 0.14s ease,
+    transform 0.14s ease;
+}
+
+.layoutChip:hover {
+  border-color: var(--wb-line-strong);
+  color: var(--wb-ink-dim);
+  transform: translateY(-1px);
+}
+
+.layoutChipActive,
+.layoutChip[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--wb-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--wb-accent) 14%, transparent);
+  color: var(--wb-ink);
+}
+
+.layoutThumb {
+  display: flex;
+  gap: 2px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--wb-surface) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-line) 80%, transparent);
+}
+
+.layoutThumbPane {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 1.5px;
+  background: currentColor;
+  opacity: 0.32;
+}
+
+.layoutThumbPane[data-units='1'] {
+  flex-grow: 1;
+}
+
+.layoutThumbPane[data-units='2'] {
+  flex-grow: 2;
+}
+
+.layoutThumbPane[data-units='3'] {
+  flex-grow: 3;
+}
+
+.layoutThumbPane[data-units='4'] {
+  flex-grow: 4;
+}
+
+.layoutThumbPane[data-units='6'] {
+  flex-grow: 6;
+}
+
+.layoutThumb_single {
+  flex-direction: column;
+}
+
+.layoutThumb_single .layoutThumbPane {
+  flex-grow: 6;
+}
+
+.layoutThumb_two_col,
+.layoutThumb_three_col,
+.layoutThumb_top_one {
+  flex-direction: row;
+}
+
+.layoutThumb_top_one {
+  flex-wrap: wrap;
+}
+
+.layoutThumb_top_one .layoutThumbPane:first-child {
+  flex: 1 0 100%;
+  margin-bottom: 2px;
+}
+
+.layoutThumb_grid_2x2,
+.layoutThumb_dashboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+
+.layoutThumb_dashboard {
+  grid-template-rows: 1fr 1fr;
+}
+
+.layoutThumb_dashboard .layoutThumbPane:first-child {
+  grid-row: span 2;
+}
+
+.layoutChipLabel {
+  font-family: var(--wb-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+/* -------------------------------------------------------------- sections -- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+/* A section title is a label on an instrument panel: mono, small, spaced. The
+   hairline after it is what makes the list below feel measured rather than
+   dumped. */
+.sectionTitle {
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--wb-ink-faint);
+  white-space: nowrap;
+}
+
+.sectionHead::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--wb-line), transparent);
+}
+
+.sectionCount {
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  color: var(--wb-ink-ghost);
+  letter-spacing: 0.04em;
+}
+
+.sectionAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* -------------------------------------------------------------- projects -- */
+
+.projectList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* A project row is a thin strip, not a card: it is a selector, and there are
+   usually only a handful. The active one is marked by a left rule and a fill. */
+.projectItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 0;
+  border-radius: var(--wb-r-sm);
+  border: 1px solid transparent;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+
+.projectItem:hover {
+  background: color-mix(in srgb, var(--wb-ink) 5%, transparent);
+}
+
+.projectItemActive {
+  background: color-mix(in srgb, var(--wb-accent) 11%, transparent);
+  border-color: color-mix(in srgb, var(--wb-accent) 32%, transparent);
+}
+
+.projectItemActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--wb-accent);
+}
+
+.projectMain {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 6px 6px 10px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.projectName {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--wb-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projectMeta {
+  margin-left: auto;
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  color: var(--wb-ink-ghost);
+  padding: 1px 5px;
+  border-radius: 99px;
+  border: 1px solid var(--wb-line);
+}
+
+.projectDelete {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.projectItem:hover .projectDelete,
+.projectItemActive .projectDelete {
+  opacity: 1;
+}
+
+.confirmRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --------------------------------------------------------------- windows -- */
+
+.windowList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.windowCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 11px;
+  border-radius: var(--wb-r-md);
+  border: 1px solid var(--wb-line);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--wb-ink) 3.5%, transparent), transparent 60%),
+    var(--wb-raised);
+  transition:
+    border-color 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.windowCard:hover {
+  border-color: var(--wb-line-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -18px rgb(0 0 0 / 90%);
+}
+
+.windowCardMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.windowTitle {
+  font-family: var(--wb-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.008em;
+  color: var(--wb-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windowSub {
+  font-family: var(--wb-mono);
+  font-size: 10px;
+  color: var(--wb-ink-ghost);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.windowActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.actionList {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.actionListLabel {
+  font-family: var(--wb-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wb-ink-ghost);
+}
+
+.actionChip {
+  padding: 1px 6px;
+  border-radius: 99px;
+  border: 1px dashed color-mix(in srgb, var(--wb-line-strong) 80%, transparent);
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  color: var(--wb-ink-faint);
+}
+
+/* ---------------------------------------------------------------- badges -- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  border: 1px solid var(--wb-line);
+  background: color-mix(in srgb, var(--wb-ink) 4%, transparent);
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--wb-ink-faint);
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  background: currentColor;
+}
+
+.badgeReady {
+  color: var(--wb-ok);
+  border-color: color-mix(in srgb, var(--wb-ok) 34%, transparent);
+  background: color-mix(in srgb, var(--wb-ok) 12%, transparent);
+}
+
+.badgeBuilding {
+  color: var(--wb-warn);
+  border-color: color-mix(in srgb, var(--wb-warn) 34%, transparent);
+  background: color-mix(in srgb, var(--wb-warn) 12%, transparent);
+}
+
+.badgeBuilding::before {
+  animation: wb-pulse 1.5s ease-in-out infinite;
+}
+
+.badgeError {
+  color: var(--wb-bad);
+  border-color: color-mix(in srgb, var(--wb-bad) 34%, transparent);
+  background: color-mix(in srgb, var(--wb-bad) 12%, transparent);
+}
+
+/* ---------------------------------------------------------------- inputs -- */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.input {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--wb-line);
+  border-radius: var(--wb-r-sm);
+  background: color-mix(in srgb, var(--wb-surface) 70%, transparent);
+  color: var(--wb-ink);
+  font-family: var(--wb-body);
+  font-size: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.input::placeholder {
+  color: var(--wb-ink-ghost);
+}
+
+.input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--wb-accent) 60%, transparent);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.folderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.folderRow label {
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wb-ink-ghost);
+}
+
+.folderHint {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--wb-ink-ghost);
+}
+
+/* ----------------------------------------------------------------- empty -- */
+
+.empty {
+  padding: 14px 12px;
+  border: 1px dashed var(--wb-line);
+  border-radius: var(--wb-r-md);
+  color: var(--wb-ink-ghost);
+  font-size: 11.5px;
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+/* ----------------------------------------------------------------- toast -- */
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: var(--wb-r-sm);
+  border: 1px solid color-mix(in srgb, var(--wb-accent) 30%, var(--wb-line));
+  background: color-mix(in srgb, var(--wb-accent) 12%, var(--wb-raised));
+  color: var(--wb-ink);
+  font-size: 11.5px;
+  line-height: 1.45;
+  animation: wb-rise 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* -------------------------------------------------------------- activity -- */
+
+.activity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 6px 2px;
+  border-radius: var(--wb-r-sm);
+  border: 1px solid var(--wb-line);
+  background: color-mix(in srgb, var(--wb-surface) 66%, transparent);
+  font-family: var(--wb-mono);
+  font-size: 10.5px;
+  line-height: 1.55;
+  scrollbar-width: thin;
+}
+
+.activityLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 1px 8px;
+  color: var(--wb-ink-dim);
+  border-radius: 3px;
+}
+
+.activityLine:hover {
+  background: color-mix(in srgb, var(--wb-ink) 4%, transparent);
+}
+
+.activityTime {
+  flex: 0 0 auto;
+  color: var(--wb-ink-ghost);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.activityAction {
+  color: color-mix(in srgb, var(--wb-accent) 82%, var(--wb-ink));
+}
+
+.activitySuccess {
+  color: var(--wb-ok);
+}
+
+.activityWarn {
+  color: var(--wb-warn);
+}
+
+.activityError {
+  color: var(--wb-bad);
+}
+
+/* ---------------------------------------------------------------- footer -- */
+
+.panelFooter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-top: 1px solid var(--wb-line);
+  background: color-mix(in srgb, var(--wb-surface) 88%, transparent);
+  font-family: var(--wb-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  color: var(--wb-ink-ghost);
+}
+
+.statusDot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--wb-ink-ghost);
+}
+
+.statusDotLive {
+  background: var(--wb-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-ok) 18%, transparent);
+  animation: wb-breathe 2.6s ease-in-out infinite;
+}
+
+.statusDotDown {
+  background: var(--wb-bad);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-bad) 18%, transparent);
+}
+
+.statusText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footerMeta {
+  margin-left: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* ===========================================================================
+   The floating layer
+   =========================================================================== */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+}
+
+.window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+  min-height: 200px;
+  overflow: hidden;
+  pointer-events: auto;
+  border-radius: 12px;
+  border: 1px solid var(--dsw-alias-border-l2, #3a3b42);
+  background: var(--dsw-alias-bg-base, #16171a);
+  color: var(--dsw-alias-label-primary, #ececef);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 6%) inset,
+    0 28px 64px -16px rgb(0 0 0 / 55%),
+    0 8px 22px -10px rgb(0 0 0 / 40%);
+  animation: wb-window-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.window:focus {
+  outline: none;
+}
+
+/* A maximised surface fills everything below the native strip and squares off:
+   it is a workspace, not a card. It is never allowed to reach `top: 0`. */
+.windowFullscreen {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  box-shadow: none;
+  animation: wb-fade 0.16s ease both;
+}
+
+.windowMinimized {
+  min-height: 0;
+  border-radius: 10px;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 6%) inset,
+    0 12px 28px -14px rgb(0 0 0 / 55%);
+}
+
+.windowResizing,
+.titlebarDragging {
+  user-select: none;
+}
+
+.windowResizing {
+  will-change: width, height;
+}
+
+/* -------------------------------------------------------------- titlebar -- */
+
+.titlebar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 6px 0 10px;
+  cursor: grab;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-label-primary, #ececef) 7%, transparent), transparent),
+    var(--dsw-alias-bg-layer-2, #222328);
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #2c2d33);
+  -webkit-app-region: no-drag;
+}
+
+.titlebarDragging .titlebar {
+  cursor: grabbing;
+}
+
+.windowFullscreen .titlebar {
+  background: var(--dsw-alias-bg-layer-2, #222328);
+}
+
+/* The window's identity mark: a small pane glyph in the accent. */
+.titleMark {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1.5px solid var(--dsw-alias-brand-primary, #4d6bfe);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 32%, transparent);
+}
+
+.titleTextWrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  line-height: 1.25;
+}
+
+.titleText {
+  font-family: 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.008em;
+  color: var(--dsw-alias-label-primary, #ececef);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titleSub {
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 9.5px;
+  color: var(--dsw-alias-label-tertiary, #7c7d85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titleBadge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  border: 1px solid var(--dsw-alias-border-l1, #2c2d33);
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary, #7c7d85);
+  white-space: nowrap;
+}
+
+.titleBadge[data-status='ready'] {
+  color: var(--dsw-alias-state-success-primary, #3fb950);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #3fb950) 36%, transparent);
+}
+
+.titleBadge[data-status='building'] {
+  color: var(--dsw-alias-state-warn-primary, #d29922);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #d29922) 36%, transparent);
+}
+
+.titleBadge[data-status='error'] {
+  color: var(--dsw-alias-state-error-primary, #f85149);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #f85149) 36%, transparent);
+}
+
+.titleActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.titleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #a8a9b0);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.13s ease,
+    color 0.13s ease,
+    border-color 0.13s ease;
+}
+
+.titleButton:hover {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary, #ececef) 11%, transparent);
+  border-color: var(--dsw-alias-border-l2, #3a3b42);
+  color: var(--dsw-alias-label-primary, #ececef);
+}
+
+.titleButtonActive {
+  color: var(--dsw-alias-brand-primary, #4d6bfe);
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 42%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 16%, transparent);
+}
+
+/* Close is the one button that turns red on hover — the muscle memory every
+   desktop user already has. */
+.titleButtonClose:hover {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #f85149) 82%, transparent);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #f85149) 82%, transparent);
+  color: #fff;
+}
+
+/* The exit affordance while a page owns the screen. A labelled, accented pill
+   instead of a glyph: at that moment "how do I get out" is the only question the
+   user has, and an icon among six icons does not answer it. It sits in the
+   titlebar row, which is always below the native strip and inside the clamped
+   box, so nothing can paint over it. */
+.titleExit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px 0 6px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 55%, transparent);
+  border-radius: 99px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 90%, #fff 10%),
+    var(--dsw-alias-brand-primary, #4d6bfe)
+  );
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition:
+    filter 0.14s ease,
+    transform 0.12s ease;
+}
+
+.titleExit:hover {
+  filter: brightness(1.08);
+}
+
+.titleExit:active {
+  transform: translateY(1px);
+}
+
+.titleExitKey {
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid rgb(255 255 255 / 45%);
+  background: rgb(0 0 0 / 18%);
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------- frames -- */
+
+.frameRow {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.frameArea {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.frameWrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--dsw-alias-bg-base, #16171a);
+}
+
+.frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+}
+
+.frameState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+}
+
+.frameStateTitle {
+  font-family: 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary, #a8a9b0);
+}
+
+.frameStateHint {
+  max-width: 36ch;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--dsw-alias-label-tertiary, #7c7d85);
+  text-wrap: pretty;
+}
+
+/* A floating status chip over a page that is not ready yet. */
+.frameHint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l2, #3a3b42);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2, #222328) 88%, transparent);
+  backdrop-filter: blur(10px);
+  color: var(--dsw-alias-label-secondary, #a8a9b0);
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 8px 20px -12px rgb(0 0 0 / 70%);
+}
+
+/* --------------------------------------------------------- resize grips -- */
+
+/* Eight invisible-but-generous grips. They sit inside the frame so the window's
+   own border is never covered, and they are the only way to resize — the
+   bottom-right dotted corner the previous version used was 18px of luck. */
+.resizeHandle {
+  position: absolute;
+  z-index: 2;
+  -webkit-app-region: no-drag;
+}
+
+.resizeHandle[data-edge='n'] {
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 5px;
+  cursor: ns-resize;
+}
+
+.resizeHandle[data-edge='s'] {
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 5px;
+  cursor: ns-resize;
+}
+
+.resizeHandle[data-edge='e'] {
+  right: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 5px;
+  cursor: ew-resize;
+}
+
+.resizeHandle[data-edge='w'] {
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 5px;
+  cursor: ew-resize;
+}
+
+.resizeHandle[data-edge='ne'] {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.resizeHandle[data-edge='nw'] {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.resizeHandle[data-edge='se'] {
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.resizeHandle[data-edge='sw'] {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+/* The bottom-right corner gets the conventional three-dot grip, because that is
+   where a user reaches without thinking. */
+.resizeHandle[data-edge='se']::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 7px;
+  height: 7px;
+  background:
+    linear-gradient(135deg, transparent 46%, var(--dsw-alias-label-tertiary, #7c7d85) 46%, var(--dsw-alias-label-tertiary, #7c7d85) 56%, transparent 56%),
+    linear-gradient(135deg, transparent 74%, var(--dsw-alias-label-tertiary, #7c7d85) 74%, var(--dsw-alias-label-tertiary, #7c7d85) 84%, transparent 84%);
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------- exit dock -- */
+
+/* Pinned below the native strip, on the left where no window control lives, and
+   deliberately outside the window: even if the artifact's page swallows every
+   click, this button is a sibling of the window, not a child of it. */
+/* Pinned to the bottom-left corner while anything is maximised. Bottom-left
+   because no native window chrome ever lives there, so this stays reachable even
+   if the strip height is misreported — it is the safety net behind the labelled
+   pill in the titlebar. Deliberately outside the window: even if the artifact's
+   page swallows every click, this is a sibling of the window, not a child.
+   Rests at reduced opacity so it reads as an affordance rather than chrome, and
+   comes to full strength on hover or keyboard focus. */
+.exitDock {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 5px 5px 11px;
+  border-radius: 99px;
+  border: 1px solid var(--dsw-alias-border-l2, #3a3b42);
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-3, #292a30) 92%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 8%) inset,
+    0 14px 32px -14px rgb(0 0 0 / 70%);
+  opacity: 0.62;
+  pointer-events: auto;
+  z-index: 2;
+  animation: wb-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: opacity 0.18s ease;
+}
+
+.exitDock:hover,
+.exitDock:focus-within {
+  opacity: 1;
+}
+
+.exitDockLabel {
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary, #7c7d85);
+  max-width: 34ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exitDockButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 52%, transparent);
+  border-radius: 99px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 92%, #fff 8%),
+    var(--dsw-alias-brand-primary, #4d6bfe)
+  );
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.14s ease, transform 0.12s ease;
+}
+
+.exitDockButton:hover {
+  filter: brightness(1.08);
+}
+
+.exitDockButton:active {
+  transform: translateY(1px);
+}
+
+.exitDockKey {
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid rgb(255 255 255 / 45%);
+  background: rgb(0 0 0 / 18%);
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+/* ===========================================================================
+   Chat pane
+   =========================================================================== */
+
+.chatPane {
+  flex: 0 0 306px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--dsw-alias-border-l1, #2c2d33);
+  background: var(--dsw-alias-bg-layer-1, #1c1d21);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+}
+
+.chatHead {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 38px;
+  padding: 0 8px 0 11px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, #2c2d33);
+}
+
+.chatHeadTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary, #7c7d85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatLog {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+}
+
+.chatEmpty {
+  padding: 18px 10px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary, #7c7d85);
+}
+
+.chatWarn {
+  padding: 6px 9px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary, #d29922) 34%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #d29922) 11%, transparent);
+  color: var(--dsw-alias-state-warn-primary, #d29922);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.chatLine {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 100%;
+}
+
+.chatRole {
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-caption, #63646b);
+}
+
+.chatLineUser .chatRole {
+  color: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 78%, var(--dsw-alias-label-caption, #63646b));
+}
+
+.chatBubble {
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--dsw-alias-border-l1, #2c2d33);
+  background: var(--dsw-alias-bg-layer-2, #222328);
+  color: var(--dsw-alias-label-primary, #ececef);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chatLineUser .chatBubble {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 30%, var(--dsw-alias-border-l1, #2c2d33));
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 13%, var(--dsw-alias-bg-layer-2, #222328));
+}
+
+.chatLineModel .chatBubble {
+  border-top-left-radius: 3px;
+}
+
+.chatLineUser .chatBubble {
+  border-top-right-radius: 3px;
+}
+
+.chatContext {
+  border-radius: 6px;
+  border: 1px dashed var(--dsw-alias-border-l1, #2c2d33);
+  padding: 4px 7px;
+  font-size: 10px;
+  color: var(--dsw-alias-label-tertiary, #7c7d85);
+}
+
+.chatContext summary {
+  cursor: pointer;
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chatContextBody {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--dsw-alias-border-l1, #2c2d33);
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 9.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chatComposer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l1, #2c2d33);
+  background: var(--dsw-alias-bg-layer-1, #1c1d21);
+}
+
+.chatTextarea {
+  width: 100%;
+  min-height: 54px;
+  max-height: 130px;
+  resize: vertical;
+  padding: 7px 9px;
+  border: 1px solid var(--dsw-alias-border-l2, #3a3b42);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-base, #16171a) 80%, transparent);
+  color: var(--dsw-alias-label-primary, #ececef);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.chatTextarea::placeholder {
+  color: var(--dsw-alias-label-caption, #63646b);
+}
+
+.chatTextarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 58%, transparent);
+}
+
+.chatComposerRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.chatHint {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: 'Cascadia Code', ui-monospace, Consolas, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+  color: var(--dsw-alias-label-caption, #63646b);
+  text-align: right;
+}
+
+/* ===========================================================================
+   Intake — the interview
+   =========================================================================== */
+
+.intake {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 12px;
+  border-radius: var(--wb-r-lg);
+  border: 1px solid color-mix(in srgb, var(--wb-accent) 30%, var(--wb-line));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--wb-accent) 8%, transparent), transparent 40%),
+    var(--wb-raised);
+  animation: wb-rise 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.intakeHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.intakeTitle {
+  font-family: var(--wb-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.012em;
+  color: var(--wb-ink);
+}
+
+.intakeHint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--wb-ink-faint);
+  text-wrap: pretty;
+}
+
+.intakeList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intakeQuestion {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-left: 9px;
+  border-left: 2px solid color-mix(in srgb, var(--wb-accent) 34%, transparent);
+}
+
+.intakeLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wb-ink);
+}
+
+.intakeLabelMeta {
+  margin-left: 2px;
+  font-family: var(--wb-mono);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wb-ink-ghost);
+}
+
+.intakeQuestionHint {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--wb-ink-ghost);
+}
+
+.intakeInput {
+  width: 100%;
+  min-height: 28px;
+  resize: vertical;
+  padding: 5px 8px;
+  border: 1px solid var(--wb-line);
+  border-radius: var(--wb-r-sm);
+  background: color-mix(in srgb, var(--wb-surface) 74%, transparent);
+  color: var(--wb-ink);
+  font-family: var(--wb-body);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.intakeInput::placeholder {
+  color: var(--wb-ink-ghost);
+}
+
+.intakeInput:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--wb-accent) 55%, transparent);
+}
+
+.intakeSummary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: var(--wb-r-sm);
+  border: 1px dashed var(--wb-line-strong);
+  background: color-mix(in srgb, var(--wb-ink) 3%, transparent);
+}
+
+.intakeSummaryLine {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--wb-ink-ghost);
+}
+
+.intakeActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* ===========================================================================
+   Market
+   =========================================================================== */
+
+/* Rows, not poster cards. A two-column grid of 16:10 screenshots turned a
+   twenty-entry catalog into four thousand pixels of scroll and buried the
+   activity log underneath it; a row keeps the thumbnail, the pitch and the
+   install button on one line and four rows fit where one card used to. */
+.marketList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.marketRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 7px;
+  border-radius: var(--wb-r-md);
+  border: 1px solid transparent;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.marketRow:hover {
+  border-color: var(--wb-line);
+  background: var(--wb-raised);
+}
+
+.marketShotButton {
+  display: block;
+  flex: 0 0 auto;
+  width: 54px;
+  height: 34px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--wb-line);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--wb-surface) 70%, transparent);
+  cursor: zoom-in;
+}
+
+/* Stands in for the thumbnail when an entry ships no screenshot, so the text
+   column still lines up with its neighbours. */
+.marketShotBlank {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 34px;
+  border-radius: 5px;
+  border: 1px dashed var(--wb-line);
+  background: color-mix(in srgb, var(--wb-surface) 50%, transparent);
+}
+
+.marketShot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.marketShotButton:hover .marketShot {
+  transform: scale(1.06);
+}
+
+.marketRowBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.marketRowHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.marketName {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--wb-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wb-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.marketVersion {
+  flex: 0 0 auto;
+  font-family: var(--wb-mono);
+  font-size: 9px;
+  color: var(--wb-ink-ghost);
+}
+
+.marketDescription {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--wb-ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.marketMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-family: var(--wb-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--wb-ink-ghost);
+}
+
+.marketTag {
+  padding: 0 5px;
+  border-radius: 3px;
+  border: 1px solid var(--wb-line);
+  font-family: var(--wb-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wb-ink-ghost);
+  white-space: nowrap;
+}
+
+.marketTagWarn {
+  color: var(--wb-warn);
+  border-color: color-mix(in srgb, var(--wb-warn) 34%, transparent);
+}
+
+.marketActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+/* Reveals the tail of a long catalog; the first four rows are what a user
+   actually browses. */
+.marketMore {
+  align-self: center;
+  padding: 3px 10px;
+  border: 1px solid var(--wb-line);
+  border-radius: 99px;
+  background: transparent;
+  font-family: var(--wb-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wb-ink-faint);
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+
+.marketMore:hover {
+  color: var(--wb-ink);
+  border-color: var(--wb-line-strong);
+}
+
+/* The screenshot lightbox: a full-bleed scrim with the shot at its own aspect
+   ratio, so a tall dashboard is not squashed to fit a card. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgb(0 0 0 / 0.62);
+  backdrop-filter: blur(3px);
+  animation: wb-fade 0.16s ease both;
+}
+
+.lightboxCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(880px, 92vw);
+  max-height: 88vh;
+  padding: 14px;
+  overflow: auto;
+  border-radius: var(--wb-r-xl);
+  border: 1px solid var(--wb-line-strong);
+  background: var(--wb-raised-2);
+  box-shadow: 0 40px 90px -30px rgb(0 0 0 / 80%);
+  animation: wb-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lightboxHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lightboxShot {
+  width: 100%;
+  height: auto;
+  border-radius: var(--wb-r-md);
+  border: 1px solid var(--wb-line);
+}
+
+.lightboxDesc {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--wb-ink-dim);
+}
+
+/* ===========================================================================
+   Motion
+   =========================================================================== */
+
+@keyframes wb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes wb-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes wb-window-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes wb-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.32;
+  }
+}
+
+@keyframes wb-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-ok) 16%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--wb-ok) 6%, transparent);
+  }
+}
+
+/* Sections enter in a short stagger. Four is enough to read as choreography;
+   beyond that it becomes a wait. */
+.panelBody > .section,
+.panelBody > .composer,
+.panelBody > .intake {
+  animation: wb-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.panelBody > *:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.panelBody > *:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.panelBody > *:nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+.panelBody > *:nth-child(5) {
+  animation-delay: 0.16s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panelBody > .section,
+  .panelBody > .composer,
+  .panelBody > .intake,
+  .toast,
+  .window,
+  .windowFullscreen,
+  .exitDock,
+  .lightbox,
+  .lightboxCard,
+  .badgeBuilding::before,
+  .statusDotLive {
+    animation: none;
+  }
+
+  .button,
+  .buttonGhost,
+  .chip,
+  .layoutChip,
+  .windowCard,
+  .marketRow,
+  .marketShot,
+  .iconButton {
+    transition: none;
+  }
+}
+
+/* ===========================================================================
+   Narrow container
+   =========================================================================== */
+
+/* The panel lives in a sidebar column, so its real width is often ~300px. Below
+   that the 52px layout chips and the market row's action button stop fitting;
+   collapse them rather than let them clip. */
+@container (max-width: 380px) {
+  .marketRow {
+    flex-wrap: wrap;
+  }
+
+  .composerFoot {
+    gap: 5px;
+  }
+
+  .layoutChip {
+    width: 46px;
+  }
+}
