@@ -1,0 +1,19 @@
+# This file is the plugin's own bundle patch. The installer reads it and appends
+# the row below to the target profile's composed tree.
+#
+# `id` is a plain, stable cell key of our own. `name` is the package name, which
+# is how the loader resolves this plugin.
+#
+# `disabled` is the double-mount guard. A bundle patch is applied on every boot,
+# so a profile that already lists this plugin (for example because the user
+# installed it twice from two different sources) would otherwise insert a second
+# copy of the same row. Two live copies of this plugin would collide on the route
+# prefix `/apps/ai-workbench/api` — and a duplicate `(kind, path)` registration
+# throws during composition, which takes down the whole application rather than
+# just this plugin. The expression below is true exactly when another enabled
+# entry with the same package name but a different id already exists, i.e. when
+# this row is the redundant one.
+- insert:
+    - id: ai-workbench
+      name: 'dsh-ai-workbench'
+      disabled: !!js "[...ctx.loader.entries()].some((e) => e.options.name === 'dsh-ai-workbench' && e.options.id !== 'ai-workbench' && !e.disabled)"
