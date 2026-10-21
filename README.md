@@ -5,7 +5,7 @@
 <p align="center">
   <img src="docs/screenshots/01-panel.png" alt="中央面板" width="720" />
   <br />
-  <em>▲ 图 1 · 中央面板：一句需求 → 几个问题 → 一个窗口 【贴图位 1】</em>
+  <em>▲ 图 1 · 中央面板：一句需求 → 几个问题 → 一个窗口 </em>
 </p>
 
 你在侧边栏的「AI 工作台」里写下「我要一个记录每天喝水的打卡表」。工作台先问你几个
@@ -19,7 +19,7 @@
 <p align="center">
   <img src="docs/screenshots/02-window.png" alt="浮层窗口" width="720" />
   <br />
-  <em>▲ 图 2 · 浮层窗口：左边是产物，右边是绑定的对话窗 【贴图位 2】</em>
+  <em>▲ 图 2 · 浮层窗口：左边是产物，右边是绑定的对话窗 </em>
 </p>
 
 | 想做什么 | 去哪一节 |
@@ -56,7 +56,7 @@ DSH 里已经有对话，但对话是线性的。你想要的是一个**长期�
 <p align="center">
   <img src="docs/screenshots/03-intake.png" alt="先问后建" width="600" />
   <br />
-  <em>▲ 图 3 · 先问后建：5–7 个带推荐选项的问题，可跳过 【贴图位 3】</em>
+  <em>▲ 图 3 · 先问后建：5–7 个带推荐选项的问题，可跳过 </em>
 </p>
 
 ---
@@ -119,7 +119,7 @@ md5/sha256、有没有能直接跑的静态页。点「安装」走的是和「�
 <p align="center">
   <img src="docs/screenshots/04-market.png" alt="模板市场" width="720" />
   <br />
-  <em>▲ 图 4 · 模板市场：标题、作者、版本、能否直接运行一目了然 【贴图位 4】</em>
+  <em>▲ 图 4 · 模板市场：标题、作者、版本、能否直接运行一目了然 </em>
 </p>
 
 安装和删除都会**立即**刷新市场列表——卡片上的「已安装」徽章、可运行标记跟着账本实
@@ -660,17 +660,16 @@ MIT
 
 ---
 
-## 截图占位清单
+## 界面截图
 
-README 里预留了 4 个贴图位，截图后按下面的名字放进 `docs/screenshots/`，GitHub 会自
-动渲染，无需再改 README：
+全部截图来自真实运行环境（Windows 11 + DSH 桌面端 0.8.1），未做任何修饰：
 
-| 文件 | 对应 README 位置 | 建议内容 | 建议尺寸 |
-| --- | --- | --- | --- |
-| `docs/screenshots/01-panel.png` | 开头封面图 | 中央面板全景：需求输入框、问题区、项目/窗口列表、底部状态栏 | 1400×900 左右 |
-| `docs/screenshots/02-window.png` | 开头第 2 张 | 一个真实工作台窗口（浮层）+ 右侧展开的对话窗 | 1400×900 左右 |
-| `docs/screenshots/03-intake.png` | 「先问后建」段 | 问题表单填到一半、带推荐选项的状态 | 900×700 左右 |
-| `docs/screenshots/04-market.png` | 「模板市场」段 | 市场列表：若干卡片，最好有一张已安装徽章 + 一张仅描述页徽章 | 1400×900 左右 |
+| 文件 | 展示内容 |
+| --- | --- |
+| [`docs/screenshots/01-panel.png`](docs/screenshots/01-panel.png) | 中央面板全景：需求输入框、布局/打开方式选择、项目与窗口列表、模板市场、底部状态栏 |
+| [`docs/screenshots/02-window.png`](docs/screenshots/02-window.png) | 一个真实工作台窗口（浮层）：标题栏含状态徽标、刷新、不透明度、最小化、对话、全屏、关闭 |
+| [`docs/screenshots/03-intake.png`](docs/screenshots/03-intake.png) | 「先问后建」的入口：一句大白话输入框 + 7 种布局预设 + 两种打开方式 |
+| [`docs/screenshots/04-market.png`](docs/screenshots/04-market.png) | 模板市场列表：版本号、分类、`仅说明页` 徽章、许可证、安装按钮 |
 
-深色/浅色各截一套更好：把 `01-panel.png` 存成 `01-panel-dark.png`，在 README 的
-`<picture>` 里换源即可（当前预留的是单图，换图不影响文字）。
+截图目录的说明见 [`docs/screenshots/README.md`](docs/screenshots/README.md)。深色/浅色各截一套更好：把
+`01-panel.png` 存成 `01-panel-dark.png`，在 README 里换源即可（当前是单图，换图不影响文字）。
