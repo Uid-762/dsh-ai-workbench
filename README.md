@@ -7,7 +7,7 @@
     <img src="docs/video/poster.png" alt="点开看 52 秒介绍视频" width="720" />
   </a>
   <br />
-  <em>▲ 52 秒介绍视频：<a href="docs/video/dsh-ai-workbench-intro.mp4">点这里播放</a>（1080p，3.1 MB）</em>
+  <em>▲ 35 秒介绍视频（1.5× 节奏，含配乐）：<a href="docs/video/dsh-ai-workbench-intro.mp4">点这里播放</a>（1080p，2.5 MB）</em>
 </p>
 
 <p align="center">
