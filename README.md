@@ -3,6 +3,14 @@
 > **一句话：** 在 DSH 里说一句大白话，AI 就给你造一个能长期存在的窗口——然后你继续跟它聊，它继续改。
 
 <p align="center">
+  <a href="docs/video/dsh-ai-workbench-intro.mp4">
+    <img src="docs/video/poster.png" alt="点开看 52 秒介绍视频" width="720" />
+  </a>
+  <br />
+  <em>▲ 52 秒介绍视频：<a href="docs/video/dsh-ai-workbench-intro.mp4">点这里播放</a>（1080p，3.1 MB）</em>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/01-panel.png" alt="中央面板" width="720" />
   <br />
   <em>▲ 图 1 · 中央面板：一句需求 → 几个问题 → 一个窗口</em>
@@ -19,7 +27,7 @@
 <p align="center">
   <img src="docs/screenshots/02-window.png" alt="浮层窗口" width="720" />
   <br />
-  <em>▲ 图 2 · 浮层窗口：左边是产物，右边是绑定的对话窗</em>
+  <em>▲ 图 2 · 浮层窗口：产物本身就是一个窗口，标题栏能刷新、调不透明度、最小化、全屏</em>
 </p>
 
 | 想做什么 | 去哪一节 |
