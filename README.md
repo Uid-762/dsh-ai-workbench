@@ -346,7 +346,7 @@ next=...
 `ctx.desktopWorkbenches.register({title, repository, …}, BusinessPanel)` 把自己注册进
 桌面壳的分栏里。
 
-**本插件跑在官方 DSH 0.2.0-rc.2 上，这个 build 没有 `desktopWorkbenches` 服务**，所以
+**本插件跑在官方 DSH 0.2.1-rc.2 上，这个 build 没有 `desktopWorkbenches` 服务**，所以
 做不到运行时注册。做的是**格式级兼容**：
 
 - 能读 `dsh-desktop` 的包：`POST /apps/ai-workbench/api/import/package` 下载 `.tgz`
