@@ -232,7 +232,7 @@ md5/sha256、有没有能直接跑的静态页。点「安装」走的是和「�
 pnpm pack --pack-destination .
 
 # 2. 装进某个 profile
-dsh plugin --profile <profile> add ./dsh-ai-workbench-0.8.1.tgz
+dsh plugin --profile <profile> add ./dsh-ai-workbench-0.8.2.tgz
 ```
 
 **桌面版（Electron）不能用 CLI 装。** 它对 `--profile desktop` 会直接报：
@@ -251,7 +251,7 @@ error: profile "desktop" is managed exclusively by the Electron application
 
 ```bash
 dsh workbench-lab --from-default-profile web --dump-config
-dsh plugin --profile workbench-lab add ./dsh-ai-workbench-0.8.1.tgz
+dsh plugin --profile workbench-lab add ./dsh-ai-workbench-0.8.2.tgz
 dsh --profile workbench-lab --port 0 --no-open
 ```
 
@@ -609,7 +609,22 @@ schema 检查，也不让一份坏目录把面板搞崩。
 
 ## 更新日志
 
-### 0.8.1（当前）
+### 0.8.2（当前）
+
+**只改文档，没有功能变更。** 起因是市场审核时被指出：文档写「动作回传给模型」，
+而代码里并不是这样。
+
+实际行为：窗口里点击声明过的动作，只会往工作台日志写一条带 payload 的记录，并推进
+面板上的「已发出」计数，**不会自动唤醒模型**。模型确实看得见这些记录——每次你发消息
+时，`buildWorkbenchSummary()` 会把最近 8 条交互记录拼进摘要——但它是在你开口之后才
+看到的，不是点击当时。
+
+改动的文件：`README.md`（开头流程、第 7 步闭环、「动作回传」整节改名「动作上报」、
+`forwardActionsToSession` 配置说明、设计取舍条目）、`package.json` 的 `description`、
+市场条目 `data/plugins/Uid-762__dsh-ai-workbench.yml` 的双语简介。顺带修了 README 里
+一个既有的断链锚点（`#给模型用的工具-workbench_window` → `#给模型用的工具workbench_window`）。
+
+### 0.8.1
 
 模板市场相关的五个问题一次修完，都是用户实际撞到的：
 
@@ -624,13 +639,6 @@ schema 检查，也不让一份坏目录把面板搞崩。
 顺带修掉的两个账本健壮性问题：`flush()` 遇到 `EPERM: operation not permitted, rename`
 （杀毒软件/OneDrive 瞬时占用）会重试 3 次并退回原地写；重复安装同一个市场包现在复用它
 的文件夹并覆盖写入，而不是生成 `<name> 2` 再报 409。
-
-### 文档修正（0.8.1 之后，未发版）
-
-把「动作回传给模型」的描述改成与实际实现一致：窗口里点击声明的动作只会**记进工作台日志**，
-不会自动唤醒模型；要模型动手，由你在对话窗里开口。改动的段落：开头的流程说明、第 7 步
-的闭环描述、「动作回传：只发关键动作」整节（改名「动作上报」）、`forwardActionsToSession`
-配置项说明、设计取舍里的「动作通道做窄」。代码未改。
 
 ---
 
@@ -691,7 +699,7 @@ MIT
 
 ## 界面截图
 
-全部截图来自真实运行环境（Windows 11 + DSH 桌面端 0.8.1），未做任何修饰：
+全部截图来自真实运行环境（Windows 11 + DSH 桌面端 0.2.1-rc.2 + 插件 0.8.1，界面在 0.8.2 未变），未做任何修饰：
 
 | 文件 | 展示内容 |
 | --- | --- |
