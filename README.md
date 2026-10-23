@@ -20,7 +20,7 @@
 小白也能答的问题（要不要每周自动总结？想要什么风格？主要用来干什么？），你确认之后，
 模型把一张自包含的单文件 HTML 写进项目文件夹，插件自动把它挂成一个可缩放、可拖动的
 窗口。窗口右边有一个绑定的对话窗，你可以在那儿继续让它改；窗口里点了关键按钮，这条
-动作会被记进工作台日志，你在对话里提一句，模型就知道你刚做了什么。
+动作连同数据会记进面板的「动作」列表给你看（不会自动送给模型，你提一句它就知道了）。
 
 不用写代码，不用装构建工具，也不用离开 DSH。
 
@@ -56,12 +56,12 @@ DSH 里已经有对话，但对话是线性的。你想要的是一个**长期�
 4. 插件读同目录的 `_workbench.json`，知道入口文件和哪些动作值得上报。
 5. 窗口以 iframe 挂进 DSH 的浮层，跟着主题走，可拖动、可缩放、可全屏。
 6. 窗口右侧的对话窗绑定同一个会话，你可以说「把颜色改成蓝色」。
-7. 你在窗口里点了一个**被声明过**的按钮 → 动作记进工作台日志 → 你在对话里提一句，
-   模型读得到这条记录并改文件 → 窗口刷新。
+7. 你在窗口里点了一个**被声明过**的按钮 → 动作连同数据记进面板的「动作」列表 →
+   你在对话里说一句「我刚点了完成一格」→ 模型据此改文件 → 窗口刷新。
 
-第 7 步是这个插件和「让模型输出一段 HTML」最大的区别：模型不需要你复述刚才点了什么。
-第 2 步是「小白能用」的关键：绝大多数人说不出自己想要什么，但能回答「你主要用它记录
-什么」。
+第 7 步是这个插件和「让模型输出一段 HTML」最大的区别：你不用再复述页面的样子。但要说
+准确：**动作是记给你看的，不会自动送到模型那里** —— 你得提一句它才知道。第 2 步是「小白
+能用」的关键：绝大多数人说不出自己想要什么，但能回答「你主要用它记录什么」。
 
 <p align="center">
   <img src="docs/screenshots/03-intake.png" alt="先问后建" width="600" />
@@ -179,10 +179,11 @@ md5/sha256、有没有能直接跑的静态页。点「安装」走的是和「�
 }
 ```
 
-**动作是记录，不是自动提问。** 点击只会往工作台日志里写一条带 payload 的记录，并推进
-面板上的「已发出」计数；它不会自己唤醒模型。你什么时候想让 AI 处理，就在对话窗里说一句
-「刚打卡了」「把这个月的数据汇总一下」——模型发消息时，摘要里会带上最近的几条交互记录，
-所以它知道你点了什么，不用你复述。
+**动作是记录，不是自动提问。** 点击会把动作连同数据记进面板的「动作」列表，并推进
+「已发出」计数；它不会自己唤醒模型，也不会自动出现在模型看到的摘要里 ——
+`buildWorkbenchSummary()` 只收 `action` / `warn` 级别的日志行，而这种点击记的是 `info`
+级、而且不带 payload。你什么时候想让 AI 处理，就在对话窗里说一句「刚打卡了」「把这个月
+的数据汇总一下」，顺便把要点说给它。
 
 这条边界是故意的：如果每次点击都自动变成一条发给模型的提示，工作台里每个按钮都会成了
 隐形触发器——你按一下「同步」，模型就自作主张开始回答，哪怕你根本没想让它开口。现在的
@@ -232,7 +233,7 @@ md5/sha256、有没有能直接跑的静态页。点「安装」走的是和「�
 pnpm pack --pack-destination .
 
 # 2. 装进某个 profile
-dsh plugin --profile <profile> add ./dsh-ai-workbench-0.8.2.tgz
+dsh plugin --profile <profile> add ./dsh-ai-workbench-0.8.3.tgz
 ```
 
 **桌面版（Electron）不能用 CLI 装。** 它对 `--profile desktop` 会直接报：
@@ -251,7 +252,7 @@ error: profile "desktop" is managed exclusively by the Electron application
 
 ```bash
 dsh workbench-lab --from-default-profile web --dump-config
-dsh plugin --profile workbench-lab add ./dsh-ai-workbench-0.8.2.tgz
+dsh plugin --profile workbench-lab add ./dsh-ai-workbench-0.8.3.tgz
 dsh --profile workbench-lab --port 0 --no-open
 ```
 
@@ -609,20 +610,41 @@ schema 检查，也不让一份坏目录把面板搞崩。
 
 ## 更新日志
 
-### 0.8.2（当前）
+### 0.8.3（当前）
+
+**只改文档，没有功能变更。** 0.8.2 里我写错了一句：「模型确实看得见这些记录——每次你
+发消息时，`buildWorkbenchSummary()` 会把最近 8 条交互记录拼进摘要」。市场维护者在合并
+时把它改对了，这一版把仓库里同样的错话一并改掉。
+
+逐处核对过的真实链路：
+
+- `src/routes/api.ts:791-796`：`recordOnly` 为真时写入的日志行是
+  `action <动作名> · recorded only — the user decides when to ask the AI`，级别是
+  **`info`**，而且**不带 payload**。
+- `src/client/store.ts` 的 `relayAction()` 永远传 `recordOnly: true` —— 界面上每一次
+  动作点击都走这一支。
+- `src/summary.ts:73-84` 的 `projectActions()` 只收 `level === 'action' || 'warn'`，
+  `info` 级会被过滤 → 这些行**不会**进入 `buildWorkbenchSummary()`，模型看不到。
+- 动作本身（含 `data`）留在客户端 store 的 `actions` 里：面板的「动作」列表看得到，
+  也能导出，它只是不流向模型。
+
+准确的说法是：**动作会被记下来给你看，不会自动送到模型那里。** 想让它据此修改，得自己
+在对话里说一句。
+
+改动的文件：`package.json` 的 `description`、本文件、市场条目
+`data/plugins/Uid-762__dsh-ai-workbench.yml` 的 `tarball`（指向 `v0.8.3`）。
+
+### 0.8.2
 
 **只改文档，没有功能变更。** 起因是市场审核时被指出：文档写「动作回传给模型」，
 而代码里并不是这样。
 
-实际行为：窗口里点击声明过的动作，只会往工作台日志写一条带 payload 的记录，并推进
-面板上的「已发出」计数，**不会自动唤醒模型**。模型确实看得见这些记录——每次你发消息
-时，`buildWorkbenchSummary()` 会把最近 8 条交互记录拼进摘要——但它是在你开口之后才
-看到的，不是点击当时。
-
 改动的文件：`README.md`（开头流程、第 7 步闭环、「动作回传」整节改名「动作上报」、
 `forwardActionsToSession` 配置说明、设计取舍条目）、`package.json` 的 `description`、
-市场条目 `data/plugins/Uid-762__dsh-ai-workbench.yml` 的双语简介。顺带修了 README 里
-一个既有的断链锚点（`#给模型用的工具-workbench_window` → `#给模型用的工具workbench_window`）。
+市场条目的双语简介。顺带修了 README 里一个既有的断链锚点
+（`#给模型用的工具-workbench_window` → `#给模型用的工具workbench_window`）。
+
+这一版有一句话仍然说错了（「模型在下次发言时能看到这些记录」），修正见 0.8.3。
 
 ### 0.8.1
 
